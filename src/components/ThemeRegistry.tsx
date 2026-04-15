@@ -1,12 +1,12 @@
 "use client";
 
+import { darkTheme, lightTheme } from "@/theme";
+import { CssBaseline, ThemeProvider } from "@mui/material";
 import { useMemo } from "react";
-import { ThemeProvider, CssBaseline } from "@mui/material";
-import { lightTheme, darkTheme } from "@/theme";
 import { ThemeModeProvider, useThemeMode } from "./ThemeModeContext";
 
 function ThemedApp({ children }: { children: React.ReactNode }) {
-  const { resolvedMode } = useThemeMode();
+  const { resolvedMode, mounted } = useThemeMode();
   const theme = useMemo(
     () => (resolvedMode === "dark" ? darkTheme : lightTheme),
     [resolvedMode],
@@ -15,7 +15,9 @@ function ThemedApp({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {children}
+      <div style={{ visibility: mounted ? "visible" : "hidden" }}>
+        {children}
+      </div>
     </ThemeProvider>
   );
 }

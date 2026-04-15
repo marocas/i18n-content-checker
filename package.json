@@ -14,11 +14,11 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "commit": "cz",
-    "release": "standard-version",
-    "release:minor": "standard-version --release-as minor",
-    "release:major": "standard-version --release-as major",
-    "release:first": "standard-version --first-release",
-    "prepare": "husky install"
+    "release": "HUSKY=0 standard-version",
+    "release:minor": "HUSKY=0 standard-version --release-as minor",
+    "release:major": "HUSKY=0 standard-version --release-as major",
+    "release:first": "HUSKY=0 standard-version --first-release",
+    "prepare": "husky install && git config --local include.path ../.gitconfig"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -27,6 +27,7 @@
     "@mui/material": "^9.0.0",
     "cheerio": "^1.2.0",
     "next": "16.2.3",
+    "ollama": "^0.6.3",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
@@ -46,7 +47,7 @@
   },
   "config": {
     "commitizen": {
-      "path": "cz-conventional-changelog"
+      "path": "./node_modules/cz-conventional-changelog"
     }
   }
 }

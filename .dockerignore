@@ -1,0 +1,16 @@
+.env*
+.github
+.husky
+.next
+.vscode
+*.md
+cicd-toolkit
+coverage
+docker-compose*
+Dockerfile*
+docs
+Jenkinsfile
+kci-*
+node_modules
+storybook-static
+!sonar-project.properties

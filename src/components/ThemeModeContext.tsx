@@ -5,7 +5,6 @@ import {
   useCallback,
   useContext,
   useMemo,
-  useState,
   useSyncExternalStore,
 } from "react";
 
@@ -16,16 +15,13 @@ interface ThemeModeContextValue {
   mode: ThemeMode;
   resolvedMode: ResolvedMode;
   setMode: (mode: ThemeMode) => void;
+  mounted: boolean;
 }
 
 const STORAGE_KEY = "theme-mode";
+const DEFAULT_MODE: ThemeMode = "system";
 
 const ThemeModeContext = createContext<ThemeModeContextValue | null>(null);
-
-function getStoredMode(): ThemeMode {
-  if (typeof window === "undefined") return "system";
-  return (localStorage.getItem(STORAGE_KEY) as ThemeMode) ?? "system";
-}
 
 function subscribeToMediaQuery(callback: () => void) {
   const mql = window.matchMedia("(prefers-color-scheme: dark)");
@@ -40,11 +36,44 @@ function getSystemSnapshot(): ResolvedMode {
 }
 
 function getServerSnapshot(): ResolvedMode {
-  return "dark";
+  return "light";
+}
+
+const noop = () => () => {};
+
+let storageModeListeners: Array<() => void> = [];
+
+function subscribeToStorageMode(callback: () => void) {
+  storageModeListeners.push(callback);
+  return () => {
+    storageModeListeners = storageModeListeners.filter((l) => l !== callback);
+  };
+}
+
+function notifyStorageModeChange() {
+  storageModeListeners.forEach((l) => l());
+}
+
+function getStoredModeSnapshot(): ThemeMode {
+  return (localStorage.getItem(STORAGE_KEY) as ThemeMode) ?? DEFAULT_MODE;
+}
+
+function getStoredModeServerSnapshot(): ThemeMode {
+  return DEFAULT_MODE;
 }
 
 export function ThemeModeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>(getStoredMode);
+  const mode = useSyncExternalStore(
+    subscribeToStorageMode,
+    getStoredModeSnapshot,
+    getStoredModeServerSnapshot,
+  );
+
+  const mounted = useSyncExternalStore(
+    noop,
+    () => true,
+    () => false,
+  );
 
   const systemPreference = useSyncExternalStore(
     subscribeToMediaQuery,
@@ -57,12 +86,12 @@ export function ThemeModeProvider({ children }: { children: React.ReactNode }) {
 
   const setMode = useCallback((next: ThemeMode) => {
     localStorage.setItem(STORAGE_KEY, next);
-    setModeState(next);
+    notifyStorageModeChange();
   }, []);
 
   const value = useMemo(
-    () => ({ mode, resolvedMode, setMode }),
-    [mode, resolvedMode, setMode],
+    () => ({ mode, resolvedMode, setMode, mounted }),
+    [mode, resolvedMode, setMode, mounted],
   );
 
   return (

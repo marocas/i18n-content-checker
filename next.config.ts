@@ -1,10 +1,11 @@
-import * as path from 'path'
 import type { NextConfig } from "next";
+import * as path from "path";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  output: "standalone",
   turbopack: {
-    root: path.join(__dirname, '..'),
+    root: path.join(__dirname, ".."),
   },
 };
 

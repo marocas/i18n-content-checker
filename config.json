@@ -1,0 +1,17 @@
+{
+  "model": "gemma4:e2b",
+  "excludedTerms": [
+    "JavaScript",
+    "CSS",
+    "HTML",
+    "CRM",
+    "API",
+    "SaaS",
+    "AI",
+    "Cloud",
+    "Talkdesk",
+    "Customer Experience",
+    "Talkdesk Copilot"
+  ],
+  "useLLM": true
+}

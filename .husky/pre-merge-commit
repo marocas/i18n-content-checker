@@ -1,0 +1,4 @@
+# Skip commitizen for merge commits
+if [ -f .git/MERGE_MSG ]; then
+  exit 0
+fi

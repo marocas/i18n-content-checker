@@ -14,6 +14,7 @@ import {
   Chip,
   Collapse,
   IconButton,
+  LinearProgress,
   Link,
   Paper,
   Typography,
@@ -46,28 +47,26 @@ function StatusChip({ status }: { status: LocaleScanResult["status"] }) {
       );
     case "error":
       return (
-        <Chip
-          icon={<ErrorIcon />}
-          label="Error"
-          color="error"
-          size="small"
-        />
+        <Chip icon={<ErrorIcon />} label="Error" color="error" size="small" />
       );
   }
 }
 
-function highlightEnglishWords(text: string, englishWords: string[]): React.ReactNode {
+function highlightEnglishWords(
+  text: string,
+  englishWords: string[],
+): React.ReactNode {
   if (englishWords.length === 0) return text;
 
   const escapedWords = englishWords.map((w) =>
-    w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
   );
   const regex = new RegExp(`\\b(${escapedWords.join("|")})\\b`, "gi");
   const parts = text.split(regex);
 
   return parts.map((part, i) => {
     const isMatch = englishWords.some(
-      (w) => w.toLowerCase() === part.toLowerCase()
+      (w) => w.toLowerCase() === part.toLowerCase(),
     );
     if (isMatch) {
       return (
@@ -90,6 +89,42 @@ function highlightEnglishWords(text: string, englishWords: string[]): React.Reac
   });
 }
 
+function TranslationCoverage({ result }: { result: LocaleScanResult }) {
+  if (result.status === "error") return null;
+
+  const translatedPct = 100 - result.untranslatedPercent;
+
+  const color =
+    translatedPct === 100
+      ? "success"
+      : translatedPct >= 80
+        ? "warning"
+        : "error";
+
+  return (
+    <Box sx={{ px: 2, pb: 1.5 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+        <Typography variant="caption" color="text.secondary">
+          {result.untranslatedPercent}% untranslated
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{ fontWeight: 600 }}
+          color={`${color}.main`}
+        >
+          {translatedPct}% translated
+        </Typography>
+      </Box>
+      <LinearProgress
+        variant="determinate"
+        value={translatedPct}
+        color={color}
+        sx={{ height: 6, borderRadius: 3 }}
+      />
+    </Box>
+  );
+}
+
 function LocaleResultRow({ result }: { result: LocaleScanResult }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -99,9 +134,10 @@ function LocaleResultRow({ result }: { result: LocaleScanResult }) {
     const lines = [
       `Locale: ${result.locale} (${result.url})`,
       `Status: ${result.status}`,
+      `Untranslated: ${result.untranslatedPercent}%`,
       "",
     ];
-    for (const sentence of result.flaggedSentences) {
+    for (const sentence of result.examples) {
       lines.push(`- "${sentence.text}"`);
       lines.push(`  English words: ${sentence.englishWords.join(", ")}`);
     }
@@ -119,8 +155,8 @@ function LocaleResultRow({ result }: { result: LocaleScanResult }) {
           result.status === "english_found"
             ? "warning.main"
             : result.status === "error"
-            ? "error.main"
-            : "divider",
+              ? "error.main"
+              : "divider",
       }}
     >
       <Box
@@ -160,24 +196,27 @@ function LocaleResultRow({ result }: { result: LocaleScanResult }) {
         </Link>
         <Box sx={{ flex: 1 }} />
         <StatusChip status={result.status} />
-        {result.flaggedSentences.length > 0 && (
+        {result.examples.length > 0 && (
           <Typography variant="body2" color="text.secondary">
-            {result.flaggedSentences.length} issue
-            {result.flaggedSentences.length !== 1 ? "s" : ""}
+            {result.examples.length} example
+            {result.examples.length !== 1 ? "s" : ""}
           </Typography>
         )}
         <IconButton size="small">
           {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
         </IconButton>
       </Box>
+      <TranslationCoverage result={result} />
       <Collapse in={expanded}>
-        <Box sx={{ px: 2, pb: 2, borderTop: "1px solid", borderColor: "divider" }}>
+        <Box
+          sx={{ px: 2, pb: 2, borderTop: "1px solid", borderColor: "divider" }}
+        >
           {result.status === "error" && (
             <Typography color="error" sx={{ py: 1 }}>
               {result.errorMessage}
             </Typography>
           )}
-          {result.flaggedSentences.length > 0 && (
+          {result.examples.length > 0 && (
             <>
               <Box sx={{ display: "flex", justifyContent: "flex-end", pt: 1 }}>
                 <Button
@@ -188,25 +227,33 @@ function LocaleResultRow({ result }: { result: LocaleScanResult }) {
                   {copied ? "Copied!" : "Copy report"}
                 </Button>
               </Box>
-              {result.flaggedSentences.map((sentence, i) => (
+              {result.examples.map((sentence, i) => (
                 <Box
                   key={i}
                   sx={{
                     py: 1,
                     borderBottom:
-                      i < result.flaggedSentences.length - 1
-                        ? "1px solid"
-                        : "none",
+                      i < result.examples.length - 1 ? "1px solid" : "none",
                     borderColor: "divider",
                   }}
                 >
                   <Typography variant="body2" sx={{ lineHeight: 1.8 }}>
-                    {highlightEnglishWords(sentence.text, sentence.englishWords)}
+                    {highlightEnglishWords(
+                      sentence.text,
+                      sentence.englishWords,
+                    )}
                   </Typography>
-                  <Box sx={{ display: "flex", gap: 0.5, mt: 0.5, flexWrap: "wrap" }}>
-                    {sentence.englishWords.map((word) => (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      gap: 0.5,
+                      mt: 0.5,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    {sentence.englishWords.map((word, j) => (
                       <Chip
-                        key={word}
+                        key={`${word}-${j}`}
                         label={word}
                         size="small"
                         color="warning"
@@ -234,7 +281,7 @@ export default function ScanResults({ results }: ScanResultsProps) {
   if (results.length === 0) return null;
 
   const englishCount = results.filter(
-    (r) => r.status === "english_found"
+    (r) => r.status === "english_found",
   ).length;
   const errorCount = results.filter((r) => r.status === "error").length;
   const cleanCount = results.filter((r) => r.status === "clean").length;
@@ -243,7 +290,12 @@ export default function ScanResults({ results }: ScanResultsProps) {
     <Box>
       <Box sx={{ display: "flex", gap: 2, mb: 2, alignItems: "center" }}>
         <Typography variant="h6">Results</Typography>
-        <Chip label={`${cleanCount} clean`} color="success" size="small" variant="outlined" />
+        <Chip
+          label={`${cleanCount} clean`}
+          color="success"
+          size="small"
+          variant="outlined"
+        />
         {englishCount > 0 && (
           <Chip
             label={`${englishCount} with English`}

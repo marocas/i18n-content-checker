@@ -1,7 +1,7 @@
 "use client";
 
-import { TextField, InputAdornment } from "@mui/material";
 import LanguageIcon from "@mui/icons-material/Language";
+import { InputAdornment, TextField } from "@mui/material";
 
 interface UrlInputProps {
   value: string;
@@ -27,7 +27,7 @@ export default function UrlInput({ value, onChange, disabled }: UrlInputProps) {
       </label>
       <TextField
         fullWidth
-        placeholder="https://www.talkdesk.com/pricing"
+        placeholder="https://www.example.com/pricing"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}

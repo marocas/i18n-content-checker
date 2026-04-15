@@ -1,0 +1,65 @@
+Build phase:
+  stages:
+    Deps: # Build dependency layer once using compose (deps service)
+      type: test
+      when:
+        - PR
+        - master
+        - staging
+        - TAG
+      steps:
+        - docker compose build deps
+    Development: # Build application image (uses deps layer automatically)
+      type: docker_build
+      when:
+        - PR
+        - master
+        - staging
+      app_images:
+        - dockerfile: Dockerfile
+          app_name: td-creative-i18n-validator
+    Production: # Build application image (uses deps layer automatically)
+      type: docker_build
+      when:
+        - TAG
+      app_images:
+        - dockerfile: Dockerfile
+          app_name: td-creative-i18n-validator
+    Publish: # Push built images (app + docs)
+      when:
+        - TAG
+        - staging
+        - master
+      type: docker_push
+
+Deploy phase:
+  stg:
+    when:
+      - staging
+    deploy mode: automatic
+    stages:
+      Deploy:
+        type: deploy_action
+        app_type: kubernetes
+        app_name:
+          - td-creative-i18n-validator
+  qa:
+    when:
+      - master
+    deploy mode: automatic
+    stages:
+      Deploy:
+        type: deploy_action
+        app_type: kubernetes
+        app_name:
+          - td-creative-i18n-validator
+  prd:
+    when:
+      - TAG
+    deploy mode: manual
+    stages:
+      Deploy:
+        type: deploy_action
+        app_type: kubernetes
+        app_name:
+          - td-creative-i18n-validator

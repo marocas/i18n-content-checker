@@ -28,6 +28,8 @@ export interface ScanRequest {
   url: string;
   locales: string[];
   excludedTerms: string[];
+  model: string;
+  useLLM: boolean;
 }
 
 export interface FlaggedSentence {
@@ -35,11 +37,17 @@ export interface FlaggedSentence {
   englishWords: string[];
 }
 
+export interface DetectionResult {
+  untranslatedPercent: number;
+  examples: FlaggedSentence[];
+}
+
 export interface LocaleScanResult {
   locale: string;
   url: string;
   status: "clean" | "english_found" | "error";
-  flaggedSentences: FlaggedSentence[];
+  untranslatedPercent: number;
+  examples: FlaggedSentence[];
   errorMessage?: string;
 }
 

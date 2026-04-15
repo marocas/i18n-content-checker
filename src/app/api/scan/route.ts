@@ -1,8 +1,8 @@
-import { detectEnglishSentences } from "@/lib/english-detector";
-import { LocaleScanResult, ScanRequest, ScanResponse } from "@/lib/types";
+import { detectEnglishWithLLM } from "@/lib/ollama-detector";
+import { LocaleScanResult, ScanRequest } from "@/lib/types";
 import { buildLocalizedUrl } from "@/lib/url-utils";
 import * as cheerio from "cheerio";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 const FETCH_TIMEOUT_MS = 15_000;
 
@@ -31,64 +31,90 @@ async function fetchPageText(url: string): Promise<string> {
     // Remove script, style, and metadata elements
     $("script, style, noscript, svg, meta, link, head").remove();
 
+    // Remove navigation chrome — focus on main content only
+    $("header, nav, footer").remove();
+
+    // Prefer <main> or <article> content; fall back to full body
+    const main = $("main, article, [role='main']").first();
+    const root = main.length ? main : $("body");
+
     // Extract visible text
-    return $("body").text().replace(/\s+/g, " ").trim();
+    return root.text().replace(/\s+/g, " ").trim();
   } finally {
     clearTimeout(timeout);
   }
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse<ScanResponse>> {
+async function scanLocale(
+  url: string,
+  locale: string,
+  model: string,
+  excludedTerms: string[],
+  useLLM: boolean,
+): Promise<LocaleScanResult> {
+  const localizedUrl = buildLocalizedUrl(url, locale);
+
+  try {
+    const pageText = await fetchPageText(localizedUrl);
+    const detection = await detectEnglishWithLLM(
+      pageText,
+      locale,
+      model,
+      excludedTerms,
+      useLLM,
+    );
+
+    return {
+      locale,
+      url: localizedUrl,
+      status: detection.untranslatedPercent > 0 ? "english_found" : "clean",
+      untranslatedPercent: detection.untranslatedPercent,
+      examples: detection.examples,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return {
+      locale,
+      url: localizedUrl,
+      status: "error",
+      untranslatedPercent: 0,
+      examples: [],
+      errorMessage: message,
+    };
+  }
+}
+
+export async function POST(request: NextRequest): Promise<Response> {
   const body: ScanRequest = await request.json();
-  const { url, locales, excludedTerms } = body;
+  const { url, locales, excludedTerms, model, useLLM } = body;
 
   if (!url || !locales?.length) {
-    return NextResponse.json(
-      { results: [] },
-      { status: 400 }
-    );
+    return Response.json({ results: [] }, { status: 400 });
   }
 
-  // Validate URL
   try {
     new URL(url);
   } catch {
-    return NextResponse.json(
-      { results: [] },
-      { status: 400 }
-    );
+    return Response.json({ results: [] }, { status: 400 });
   }
 
-  const results: LocaleScanResult[] = await Promise.all(
-    locales.map(async (locale): Promise<LocaleScanResult> => {
-      const localizedUrl = buildLocalizedUrl(url, locale);
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
 
-      try {
-        const pageText = await fetchPageText(localizedUrl);
-        const flagged = detectEnglishSentences(pageText, excludedTerms);
-
-        return {
-          locale,
-          url: localizedUrl,
-          status: flagged.length > 0 ? "english_found" : "clean",
-          flaggedSentences: flagged.map((f) => ({
-            text: f.text,
-            englishWords: f.englishWords,
-          })),
-        };
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
-        return {
-          locale,
-          url: localizedUrl,
-          status: "error",
-          flaggedSentences: [],
-          errorMessage: message,
-        };
+      for (const locale of locales) {
+        const result = await scanLocale(url, locale, model, excludedTerms, useLLM);
+        controller.enqueue(encoder.encode(JSON.stringify(result) + "\n"));
       }
-    })
-  );
 
-  return NextResponse.json({ results });
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson",
+      "Transfer-Encoding": "chunked",
+    },
+  });
 }

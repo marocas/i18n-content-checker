@@ -1,0 +1,42 @@
+# Unified composition: single dependency install reused across all services.
+# Workflow:
+#   1. docker compose build deps   (runs pnpm install once via Dockerfile deps stage)
+#   2. docker compose build app    (builds Next.js using cached deps layer)
+#   3. docker compose up app       (run services)
+# Notes:
+# - BuildKit layer cache handles reuse; services reference the same Dockerfile.
+# - Source mounted for rapid iteration; remove volume mounts to create immutable images.
+
+services:
+  deps:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deps
+    image: i18n/deps:local
+    command: ["sh", "-c", "tail -f /dev/null"]
+    volumes:
+      - ./:/app
+    working_dir: /app
+
+  app:
+    depends_on:
+      - deps
+      - ollama
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime-app
+    image: i18n/app:local
+    ports:
+      - "3000:3000"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ollama-data:/root/.ollama
+
+volumes:
+  ollama-data:
