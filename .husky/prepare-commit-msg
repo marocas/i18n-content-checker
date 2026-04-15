@@ -1,0 +1,12 @@
+# Get arguments
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+COMMIT_SHA=$3
+
+# Skip commitizen for merge commits, amends, rebases, squash, or fixup
+if [ "$COMMIT_SOURCE" = "merge" ] || [ "$COMMIT_SOURCE" = "commit" ] || [ "$COMMIT_SOURCE" = "message" ] || [ "$COMMIT_SOURCE" = "squash" ]; then
+  exit 0
+fi
+
+# Run commitizen only for new commits
+exec < /dev/tty && npx cz --hook || true

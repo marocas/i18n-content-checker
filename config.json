@@ -1,0 +1,13 @@
+{
+  "model": "gemma3:4b",
+  "excludedTerms": [
+    "JavaScript",
+    "CSS",
+    "HTML",
+    "CRM",
+    "API",
+    "SaaS",
+    "AI",
+    "Cloud"
+  ]
+}

@@ -1,7 +1,7 @@
 "use client";
 
-import { Box, Chip } from "@mui/material";
 import { AVAILABLE_LOCALES } from "@/lib/types";
+import { Box, Chip } from "@mui/material";
 
 interface LocaleSelectorProps {
   selectedLocales: string[];
@@ -44,7 +44,7 @@ export default function LocaleSelector({
           return (
             <Chip
               key={locale.code}
-              label={`${locale.flag}  ${locale.code}  ${locale.label}`}
+              label={`${locale.flag} ${locale.label}`}
               onClick={() => !disabled && toggleLocale(locale.code)}
               variant={isSelected ? "filled" : "outlined"}
               color={isSelected ? "primary" : "default"}
