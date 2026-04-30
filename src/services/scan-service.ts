@@ -1,5 +1,12 @@
 import { LocaleScanResult, ScanRequest } from "@/lib/types";
 
+export class OllamaUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OllamaUnavailableError";
+  }
+}
+
 export async function scanLocales(
   request: ScanRequest,
   onResult: (result: LocaleScanResult) => void,
@@ -30,11 +37,19 @@ export async function scanLocales(
 
     for (const line of lines) {
       if (!line.trim()) continue;
-      onResult(JSON.parse(line));
+      const parsed = JSON.parse(line);
+      if (parsed._streamError === "ollama_unavailable") {
+        throw new OllamaUnavailableError(parsed.message);
+      }
+      onResult(parsed);
     }
   }
 
   if (buffer.trim()) {
-    onResult(JSON.parse(buffer));
+    const parsed = JSON.parse(buffer);
+    if (parsed._streamError === "ollama_unavailable") {
+      throw new OllamaUnavailableError(parsed.message);
+    }
+    onResult(parsed);
   }
 }
