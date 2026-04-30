@@ -1,15 +1,27 @@
 "use client";
 
 import LanguageIcon from "@mui/icons-material/Language";
-import { InputAdornment, TextField } from "@mui/material";
+import { Autocomplete, Chip, InputAdornment, TextField } from "@mui/material";
+import { useState } from "react";
 
 interface UrlInputProps {
-  value: string;
-  onChange: (value: string) => void;
+  value: string[];
+  onChange: (value: string[]) => void;
   disabled?: boolean;
 }
 
+function isValidUrl(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export default function UrlInput({ value, onChange, disabled }: UrlInputProps) {
+  const [inputValue, setInputValue] = useState("");
+
   return (
     <>
       <label
@@ -23,28 +35,60 @@ export default function UrlInput({ value, onChange, disabled }: UrlInputProps) {
           display: "block",
         }}
       >
-        English URL to scan
+        English URLs to scan
       </label>
-      <TextField
-        fullWidth
-        placeholder="https://www.example.com/pricing"
+      <Autocomplete
+        multiple
+        freeSolo
+        options={[]}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        inputValue={inputValue}
         disabled={disabled}
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <LanguageIcon sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
-          },
+        onInputChange={(_e, newValue) => setInputValue(newValue)}
+        onChange={(_e, newValue) => {
+          const urls = newValue.filter((v) => isValidUrl(v));
+          onChange(urls);
+          if (newValue.length > urls.length) {
+            // Keep invalid text in the input so the user can fix it
+            const rejected = newValue.find((v) => !isValidUrl(v));
+            if (rejected) setInputValue(rejected);
+          }
         }}
-        sx={{
-          "& .MuiOutlinedInput-root": {
-            backgroundColor: "background.paper",
-          },
-        }}
+        renderTags={(tagValue, getTagProps) =>
+          tagValue.map((option, index) => {
+            const { key, ...rest } = getTagProps({ index });
+            return <Chip key={key} label={option} size="small" {...rest} />;
+          })
+        }
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            placeholder={
+              value.length === 0
+                ? "https://www.example.com/pricing (press Enter to add)"
+                : "Add another URL…"
+            }
+            slotProps={{
+              ...params.slotProps,
+              input: {
+                ...params.slotProps.input,
+                startAdornment: (
+                  <>
+                    <InputAdornment position="start">
+                      <LanguageIcon sx={{ color: "text.secondary" }} />
+                    </InputAdornment>
+                    {params.slotProps.input.startAdornment}
+                  </>
+                ),
+              },
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                backgroundColor: "background.paper",
+              },
+            }}
+          />
+        )}
       />
     </>
   );

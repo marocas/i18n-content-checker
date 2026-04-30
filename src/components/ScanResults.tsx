@@ -315,7 +315,10 @@ export default function ScanResults({ results }: ScanResultsProps) {
       </Box>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
         {results.map((result) => (
-          <LocaleResultRow key={result.locale} result={result} />
+          <LocaleResultRow
+            key={`${result.locale}-${result.url}`}
+            result={result}
+          />
         ))}
       </Box>
     </Box>

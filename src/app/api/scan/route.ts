@@ -1,4 +1,7 @@
-import { detectEnglishWithLLM } from "@/lib/ollama-detector";
+import {
+  detectEnglishWithLLM,
+  isOllamaConnectionError,
+} from "@/lib/ollama-detector";
 import { LocaleScanResult, ScanRequest } from "@/lib/types";
 import { buildLocalizedUrl } from "@/lib/url-utils";
 import * as cheerio from "cheerio";
@@ -35,11 +38,23 @@ async function fetchPageText(url: string): Promise<string> {
     $("header, nav, footer").remove();
 
     // Prefer <main> or <article> content; fall back to full body
-    const main = $("main, article, [role='main']").first();
+    const main = $("main.main").first();
     const root = main.length ? main : $("body");
 
-    // Extract visible text
-    return root.text().replace(/\s+/g, " ").trim();
+    // Insert newlines after block-level elements so headings become
+    // separate "sentences" for downstream detection
+    const BLOCK_TAGS =
+      "p, h1, h2, h3, h4, h5, h6, li, td, th, div, section, article, blockquote, figcaption, dt, dd";
+    root.find(BLOCK_TAGS).each((_, el) => {
+      $(el).append("\n");
+    });
+
+    // Extract visible text, collapse runs of whitespace but keep newlines
+    return root
+      .text()
+      .replace(/[^\S\n]+/g, " ")
+      .replace(/\n{2,}/g, "\n")
+      .trim();
   } finally {
     clearTimeout(timeout);
   }
@@ -86,25 +101,64 @@ async function scanLocale(
 
 export async function POST(request: NextRequest): Promise<Response> {
   const body: ScanRequest = await request.json();
-  const { url, locales, excludedTerms, model, useLLM } = body;
+  const { urls, locales, excludedTerms, model, useLLM } = body;
 
-  if (!url || !locales?.length) {
+  if (!urls?.length || !locales?.length) {
     return Response.json({ results: [] }, { status: 400 });
   }
 
-  try {
-    new URL(url);
-  } catch {
-    return Response.json({ results: [] }, { status: 400 });
+  for (const u of urls) {
+    try {
+      new URL(u);
+    } catch {
+      return Response.json({ results: [] }, { status: 400 });
+    }
   }
 
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
 
-      for (const locale of locales) {
-        const result = await scanLocale(url, locale, model, excludedTerms, useLLM);
-        controller.enqueue(encoder.encode(JSON.stringify(result) + "\n"));
+      for (const url of urls) {
+        for (const locale of locales) {
+          try {
+            const result = await scanLocale(
+              url,
+              locale,
+              model,
+              excludedTerms,
+              useLLM,
+            );
+            controller.enqueue(encoder.encode(JSON.stringify(result) + "\n"));
+          } catch (err) {
+            if (isOllamaConnectionError(err)) {
+              const errorEvent = {
+                _streamError: "ollama_unavailable",
+                message:
+                  "Could not connect to Ollama. Make sure it is running with `ollama serve`.",
+              };
+              controller.enqueue(
+                encoder.encode(JSON.stringify(errorEvent) + "\n"),
+              );
+              controller.close();
+              return;
+            }
+            // Non-connection errors: report per-locale and continue
+            const message =
+              err instanceof Error ? err.message : "Unknown error";
+            const errorResult: LocaleScanResult = {
+              locale,
+              url: "",
+              status: "error",
+              untranslatedPercent: 0,
+              examples: [],
+              errorMessage: message,
+            };
+            controller.enqueue(
+              encoder.encode(JSON.stringify(errorResult) + "\n"),
+            );
+          }
+        }
       }
 
       controller.close();

@@ -1,5 +1,5 @@
 import { Ollama } from "ollama";
-import { detectLanguageHeuristic, ENGLISH_MARKERS, HeuristicResult } from "./language-heuristic";
+import { detectLanguageHeuristic, HeuristicResult } from "./language-heuristic";
 import { DetectionResult, FlaggedSentence } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -53,25 +53,28 @@ function parseLLMResponse(
 
   const sourceLower = sourceText.toLowerCase();
 
-  return parsed.examples
-    .filter(
-      (s: { text?: unknown; englishWords?: unknown }) =>
-        typeof s.text === "string" &&
-        Array.isArray(s.englishWords) &&
-        s.englishWords.length > 0,
-    )
-    // Drop hallucinated sentences — text must appear in the source
-    .filter((s: { text: string }) => sourceLower.includes(s.text.toLowerCase()))
-    .slice(0, MAX_EXAMPLES)
-    .map((s: { text: string; englishWords: string[] }) => ({
-      text: s.text,
-      // Only keep words the heuristic recognises as English markers
-      englishWords: s.englishWords
-        .filter((w: unknown): w is string => typeof w === "string")
-        .filter((w) => ENGLISH_MARKERS.has(w.toLowerCase())),
-    }))
-    // Drop sentences where no valid English words survived the filter
-    .filter((s: { englishWords: string[] }) => s.englishWords.length > 0);
+  return (
+    parsed.examples
+      .filter(
+        (s: { text?: unknown; englishWords?: unknown }) =>
+          typeof s.text === "string" &&
+          Array.isArray(s.englishWords) &&
+          s.englishWords.length > 0,
+      )
+      // Drop hallucinated sentences — text must appear in the source
+      .filter((s: { text: string }) =>
+        sourceLower.includes(s.text.toLowerCase()),
+      )
+      .slice(0, MAX_EXAMPLES)
+      .map((s: { text: string; englishWords: string[] }) => ({
+        text: s.text,
+        // Trust the LLM's word identification — don't re-filter through the heuristic word list
+        englishWords: s.englishWords.filter(
+          (w: unknown): w is string => typeof w === "string" && w.length > 0,
+        ),
+      }))
+      .filter((s: { englishWords: string[] }) => s.englishWords.length > 0)
+  );
 }
 
 function splitIntoChunks(text: string): string[] {
@@ -153,11 +156,6 @@ export async function detectEnglishWithLLM(
   // Fast heuristic for the percentage and all flagged sentences
   const heuristic: HeuristicResult = detectLanguageHeuristic(text);
 
-  // If fully translated, skip everything
-  if (heuristic.untranslatedPercent === 0) {
-    return { untranslatedPercent: 0, examples: [] };
-  }
-
   // Filter excluded terms from displayed englishWords (case-insensitive)
   // but keep detection untouched so no sentences slip through
   const excludedLower = new Set(excludedTerms.map((t) => t.toLowerCase()));
@@ -166,7 +164,9 @@ export async function detectEnglishWithLLM(
     return examples
       .map((s) => ({
         text: s.text,
-        englishWords: s.englishWords.filter((w) => !excludedLower.has(w.toLowerCase())),
+        englishWords: s.englishWords.filter(
+          (w) => !excludedLower.has(w.toLowerCase()),
+        ),
       }))
       .filter((s) => s.englishWords.length > 0);
   }
@@ -177,6 +177,10 @@ export async function detectEnglishWithLLM(
   );
 
   if (!useLLM) {
+    // Without the LLM, trust the heuristic alone
+    if (heuristic.untranslatedPercent === 0) {
+      return { untranslatedPercent: 0, examples: [] };
+    }
     return {
       untranslatedPercent: heuristic.untranslatedPercent,
       examples: filterExcluded(heuristicExamples),
@@ -204,15 +208,37 @@ export async function detectEnglishWithLLM(
       }
     }
 
+    const filteredMerged = filterExcluded(merged);
+
+    // If the LLM found English the heuristic missed, ensure we report > 0%
+    const untranslatedPercent =
+      heuristic.untranslatedPercent > 0 || filteredMerged.length === 0
+        ? heuristic.untranslatedPercent
+        : 1; // floor at 1% so LLM findings surface
+
     return {
-      untranslatedPercent: heuristic.untranslatedPercent,
-      examples: filterExcluded(merged),
+      untranslatedPercent,
+      examples: filteredMerged,
     };
-  } catch {
-    // LLM failed — still return heuristic results
+  } catch (err) {
+    // Re-throw connection errors so callers can show a clear message
+    if (isOllamaConnectionError(err)) {
+      throw err;
+    }
+    // Other LLM failures — still return heuristic results
     return {
       untranslatedPercent: heuristic.untranslatedPercent,
       examples: filterExcluded(heuristicExamples),
     };
   }
+}
+
+export function isOllamaConnectionError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return (
+    msg.includes("econnrefused") ||
+    msg.includes("fetch failed") ||
+    (msg.includes("connect") && msg.includes("refused"))
+  );
 }

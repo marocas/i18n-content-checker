@@ -25,7 +25,7 @@ export const DEFAULT_EXCLUDED_TERMS = [
 ];
 
 export interface ScanRequest {
-  url: string;
+  urls: string[];
   locales: string[];
   excludedTerms: string[];
   model: string;

@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, KeyboardEvent } from "react";
-import { Box, Chip, TextField, Button } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import {
+  Box,
+  Button,
+  Chip,
+  Collapse,
+  IconButton,
+  TextField,
+} from "@mui/material";
+import { KeyboardEvent, useState } from "react";
 
 interface ExclusionListProps {
   terms: string[];
@@ -16,6 +25,7 @@ export default function ExclusionList({
   disabled,
 }: ExclusionListProps) {
   const [inputValue, setInputValue] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   const addTerms = () => {
     const newTerms = inputValue
@@ -42,19 +52,34 @@ export default function ExclusionList({
 
   return (
     <>
-      <label
-        style={{
-          fontSize: "0.75rem",
-          fontWeight: 600,
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-          color: "#aaa",
-          marginBottom: 8,
-          display: "block",
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          mb: 1,
         }}
       >
-        Excluded terms (intentionally English)
-      </label>
+        <label
+          style={{
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: "#aaa",
+            display: "block",
+          }}
+        >
+          Excluded terms ({terms.length})
+        </label>
+        <Box sx={{ flex: 1 }} />
+        <IconButton size="small" onClick={() => setExpanded(!expanded)}>
+          {expanded ? (
+            <ExpandLessIcon fontSize="small" />
+          ) : (
+            <ExpandMoreIcon fontSize="small" />
+          )}
+        </IconButton>
+      </Box>
       <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
         <TextField
           fullWidth
@@ -79,18 +104,20 @@ export default function ExclusionList({
           Add
         </Button>
       </Box>
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-        {terms.map((term) => (
-          <Chip
-            key={term}
-            label={term}
-            onDelete={() => removeTerm(term)}
-            deleteIcon={<CloseIcon />}
-            disabled={disabled}
-            variant="outlined"
-          />
-        ))}
-      </Box>
+      <Collapse in={expanded}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+          {terms.map((term) => (
+            <Chip
+              key={term}
+              label={term}
+              onDelete={() => removeTerm(term)}
+              deleteIcon={<CloseIcon />}
+              disabled={disabled}
+              variant="outlined"
+            />
+          ))}
+        </Box>
+      </Collapse>
     </>
   );
 }

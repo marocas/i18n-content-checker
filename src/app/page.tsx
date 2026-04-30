@@ -12,7 +12,7 @@ import {
   LocaleScanResult,
 } from "@/lib/types";
 import { fetchConfig, saveConfig } from "@/services/config-service";
-import { scanLocales } from "@/services/scan-service";
+import { OllamaUnavailableError, scanLocales } from "@/services/scan-service";
 import SearchIcon from "@mui/icons-material/Search";
 import {
   Alert,
@@ -21,6 +21,7 @@ import {
   Container,
   FormControlLabel,
   LinearProgress,
+  Snackbar,
   Switch,
   Tooltip,
   Typography,
@@ -47,7 +48,7 @@ function useDebouncedSave(value: unknown, key: string, delayMs = 500): void {
 }
 
 export default function Home() {
-  const [url, setUrl] = useState("");
+  const [urls, setUrls] = useState<string[]>([]);
   const [selectedLocales, setSelectedLocales] = useState(
     AVAILABLE_LOCALES.map((l) => l.code),
   );
@@ -58,6 +59,7 @@ export default function Home() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [ollamaToast, setOllamaToast] = useState(false);
 
   // Load saved config on mount
   useEffect(() => {
@@ -78,18 +80,9 @@ export default function Home() {
   useDebouncedSave(excludedTerms, "excludedTerms");
   useDebouncedSave(useLLM, "useLLM");
 
-  const isValidUrl = (value: string) => {
-    try {
-      new URL(value);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
   const handleScan = async () => {
-    if (!isValidUrl(url)) {
-      setError("Please enter a valid URL (include https://)");
+    if (urls.length === 0) {
+      setError("Add at least one URL to scan (press Enter after typing)");
       return;
     }
     if (selectedLocales.length === 0) {
@@ -103,11 +96,21 @@ export default function Home() {
 
     try {
       await scanLocales(
-        { url, locales: selectedLocales, excludedTerms, model: selectedModel, useLLM },
+        {
+          urls,
+          locales: selectedLocales,
+          excludedTerms,
+          model: selectedModel,
+          useLLM,
+        },
         (result) => setResults((prev) => [...prev, result]),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Scan failed");
+      if (err instanceof OllamaUnavailableError) {
+        setOllamaToast(true);
+      } else {
+        setError(err instanceof Error ? err.message : "Scan failed");
+      }
     } finally {
       setScanning(false);
     }
@@ -137,14 +140,16 @@ export default function Home() {
       <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
         <Box sx={{ display: "flex", gap: 1, alignItems: "flex-end" }}>
           <Box sx={{ flex: 1 }}>
-            <UrlInput value={url} onChange={setUrl} disabled={scanning} />
+            <UrlInput value={urls} onChange={setUrls} disabled={scanning} />
           </Box>
           <Button
             variant="contained"
             size="large"
             startIcon={<SearchIcon />}
             onClick={handleScan}
-            disabled={scanning || !url.trim() || (useLLM && !selectedModel)}
+            disabled={
+              scanning || urls.length === 0 || (useLLM && !selectedModel)
+            }
             sx={{ px: 4, height: 56 }}
           >
             {scanning ? "Scanning..." : "Scan pages"}
@@ -209,6 +214,23 @@ export default function Home() {
 
         <ScanResults results={results} />
       </Box>
+
+      <Snackbar
+        open={ollamaToast}
+        autoHideDuration={8000}
+        onClose={() => setOllamaToast(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setOllamaToast(false)}
+          severity="error"
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          Could not connect to Ollama. Make sure it is running with{" "}
+          <code>ollama serve</code>.
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }
