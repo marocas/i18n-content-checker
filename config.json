@@ -1,5 +1,5 @@
 {
-  "model": "gemma4:e2b",
+  "model": "nomic-embed-text:latest",
   "excludedTerms": [
     "JavaScript",
     "CSS",
@@ -8,10 +8,7 @@
     "API",
     "SaaS",
     "AI",
-    "Cloud",
-    "Talkdesk",
-    "Customer Experience",
-    "Talkdesk Copilot"
+    "Cloud"
   ],
-  "useLLM": true
+  "useLLM": false
 }

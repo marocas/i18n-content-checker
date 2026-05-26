@@ -1,6 +1,8 @@
 # i18n Content Checker
 
-A Next.js web application that scans localized web pages for untranslated English content. Enter a URL, select target locales, and the tool will detect English text that may have been left untranslated.
+A Next.js 16 + Payload CMS v3 web application that scans localized web pages for untranslated English content. Enter a URL, select target locales, and the tool will detect English text that may have been left untranslated.
+
+The CMS layer (Payload) manages pages, posts, and site content with i18n support, while the scanner feature handles translation quality checks.
 
 ## Supported Locales
 
@@ -123,36 +125,15 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Scripts
 
-| Command              | Description                               |
-| -------------------- | ----------------------------------------- |
-| `pnpm dev`           | Start development server                  |
-| `pnpm build`         | Build for production                      |
-| `pnpm start`         | Start production server                   |
-| `pnpm lint`          | Run ESLint                                |
-| `pnpm commit`        | Create a conventional commit (Commitizen) |
-| `pnpm release`       | Bump version & generate CHANGELOG         |
-| `pnpm release:minor` | Release as minor version bump             |
-| `pnpm release:major` | Release as major version bump             |
-| `pnpm release:first` | Generate the first release                |
-
-## Commit Convention
-
-This project uses [Commitizen](https://github.com/commitizen/cz-cli) with the [Conventional Changelog](https://www.conventionalcommits.org/) format. Use `pnpm commit` instead of `git commit` to get an interactive prompt.
-
-## Releasing
-
-Versioning and changelog generation are handled by [standard-version](https://github.com/conventional-changelog/standard-version):
-
-```bash
-# First release
-pnpm release:first
-
-# Subsequent releases (auto-detects bump from commits)
-pnpm release
-```
-
-This will:
-
-1. Bump the version in `package.json`
-2. Update `CHANGELOG.md`
-3. Create a version commit and git tag
+| Command          | Description                             |
+| ---------------- | --------------------------------------- |
+| `pnpm dev`       | Start development server (Turbopack)    |
+| `pnpm build`     | Build for production                    |
+| `pnpm start`     | Start production server                 |
+| `pnpm lint`      | Run ESLint                              |
+| `pnpm test`      | Run all tests (integration + e2e)       |
+| `pnpm test:int`  | Vitest integration tests only           |
+| `pnpm test:e2e`  | Playwright e2e tests only               |
+| `pnpm mcp`       | Start MCP server (requires app running) |
+| `pnpm seed`      | Seed the database                       |
+| `pnpm dev:fresh` | Reset DB schema + start dev             |

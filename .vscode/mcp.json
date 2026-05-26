@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "i18n-content-checker": {
+      "type": "stdio",
+      "command": "pnpm",
+      "args": ["mcp"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "SCANNER_BASE_URL": "http://localhost:3000"
+      }
+    }
+  }
+}
