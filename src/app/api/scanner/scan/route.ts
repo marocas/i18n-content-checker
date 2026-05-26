@@ -14,7 +14,7 @@ async function fetchPageText(url: string): Promise<string> {
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) i18n-content-checker/1.0',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) i18n-scanner/1.0',
         Accept: 'text/html,application/xhtml+xml',
         'Accept-Language': 'en-US,en;q=0.5',
       },

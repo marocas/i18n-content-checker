@@ -1,6 +1,6 @@
 # v1 Scan Architecture Map
 
-Reference architecture of the i18n-content-checker v1 scan flow.
+Reference architecture of the i18n-scanner v1 scan flow.
 Use this as the canonical source when porting or comparing with v2.
 
 ## Data Flow

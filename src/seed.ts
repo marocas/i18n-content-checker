@@ -129,7 +129,7 @@ export const seed = async (payload: Payload): Promise<void> => {
           },
         ],
         meta: {
-          title: 'Home | i18n Content Checker',
+          title: 'Home | i18n Scanner',
           description:
             'A demo website showcasing multi-language content management with AI-powered translations.',
         },

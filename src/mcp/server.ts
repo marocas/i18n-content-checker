@@ -9,7 +9,7 @@ const BASE_URL = process.env.SCANNER_BASE_URL ?? 'http://localhost:3000'
 const FETCH_TIMEOUT_MS = 120_000
 
 const server = new McpServer({
-  name: 'i18n-content-checker',
+  name: 'i18n-scanner',
   version: '1.0.0',
 })
 
@@ -77,6 +77,15 @@ async function readNdjsonStream(response: Response): Promise<LocaleScanResult[]>
   return results
 }
 
+// ── Active Scans Registry ────────────────────────────────────
+
+const activeScans = new Map<string, AbortController>()
+let scanCounter = 0
+
+function generateScanId(): string {
+  return `scan_${++scanCounter}_${Date.now()}`
+}
+
 function formatResults(results: LocaleScanResult[], sourceUrls: string[]): string {
   if (results.length === 0) return 'No results.'
 
@@ -113,12 +122,17 @@ function formatResults(results: LocaleScanResult[], sourceUrls: string[]): strin
   return lines.join('\n')
 }
 
-async function fetchAvailableLocales(): Promise<LocaleConfig[]> {
+interface ScannerBlockDefaults {
+  locales: LocaleConfig[]
+  excludedTerms: string[]
+}
+
+async function fetchBlockDefaults(): Promise<ScannerBlockDefaults> {
   try {
-    return await fetchJson<LocaleConfig[]>('/api/scanner/locales')
+    return await fetchJson<ScannerBlockDefaults>('/api/scanner/locales')
   } catch (error) {
-    log('warn', 'fetch_locales', error instanceof Error ? error.message : 'Unknown error')
-    return []
+    log('warn', 'fetch_block_defaults', error instanceof Error ? error.message : 'Unknown error')
+    return { locales: [], excludedTerms: [] }
   }
 }
 
@@ -139,50 +153,62 @@ function createLocalesSchema(locales: LocaleConfig[]) {
   return z.array(z.enum(localeCodes)).optional().describe(describeLocales(locales))
 }
 
-function registerTools(availableLocales: LocaleConfig[]) {
+function registerTools(blockDefaults: ScannerBlockDefaults) {
+  const availableLocales = blockDefaults.locales
+
   // ── Tools ────────────────────────────────────────────────────
 
-  server.tool(
+  server.registerTool(
     'scan_pages',
-    'Scan one or more URLs for untranslated (English) content in the specified locales. Returns a detailed report per URL/locale combination.',
-    {
-      urls: z.array(z.url()).describe('URLs to scan (English version of the pages)'),
-      locales: createLocalesSchema(availableLocales),
-      useLLM: z
-        .boolean()
-        .optional()
-        .describe('Use LLM (Ollama) for example extraction. Defaults to current config.'),
-    },
     {
       title: 'Scan Pages for Untranslated Content',
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: true,
+      description:
+        'Scan one or more URLs for untranslated (English) content in the specified locales. Returns a detailed report per URL/locale combination.',
+      inputSchema: {
+        urls: z.array(z.url()).describe('URLs to scan (English version of the pages)'),
+        locales: createLocalesSchema(availableLocales),
+        useLLM: z
+          .boolean()
+          .optional()
+          .describe('Use LLM (Ollama) for example extraction. Defaults to current config.'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: true,
+      },
     },
     async ({ urls, locales, useLLM }) => {
+      const scanId = generateScanId()
       log(
         'info',
         'scan_pages',
-        `Scanning ${urls.length} URL(s) across ${locales?.length ?? 'all'} locale(s)`,
+        `[${scanId}] Scanning ${urls.length} URL(s) across ${locales?.length ?? 'all'} locale(s)`,
       )
 
-      // Fetch current config for defaults
+      // Fetch user config + block defaults, merge excludedTerms
       const config = await fetchJson<AppConfig>('/api/scanner/config')
-      const currentLocales = await fetchAvailableLocales()
-      const fallbackLocales = currentLocales.length > 0 ? currentLocales : availableLocales
+      const currentDefaults = await fetchBlockDefaults()
+      const fallbackLocales =
+        currentDefaults.locales.length > 0 ? currentDefaults.locales : availableLocales
       const selectedLocales = locales?.length
         ? locales
         : fallbackLocales.map((locale) => locale.code)
 
+      // User overrides take priority; fall back to block defaults
+      const excludedTerms =
+        config.excludedTerms.length > 0 ? config.excludedTerms : currentDefaults.excludedTerms
+
       const body = {
         urls,
         locales: selectedLocales,
-        excludedTerms: config.excludedTerms,
+        excludedTerms,
         model: config.model,
         useLLM: useLLM ?? config.useLLM,
       }
 
       const controller = new AbortController()
+      activeScans.set(scanId, controller)
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
 
       try {
@@ -205,25 +231,38 @@ function registerTools(availableLocales: LocaleConfig[]) {
         }
 
         const results = await readNdjsonStream(response)
-        log('info', 'scan_pages', `Scan complete: ${results.length} result(s)`)
+        log('info', 'scan_pages', `[${scanId}] Scan complete: ${results.length} result(s)`)
         const report = formatResults(results, urls)
 
         return { content: [{ type: 'text' as const, text: report }] }
+      } catch (err) {
+        if (
+          controller.signal.aborted &&
+          !(err instanceof Error && err.message.includes('timeout'))
+        ) {
+          log('info', 'scan_pages', `[${scanId}] Scan cancelled`)
+          return {
+            content: [{ type: 'text' as const, text: `Scan ${scanId} was cancelled.` }],
+          }
+        }
+        throw err
       } finally {
         clearTimeout(timeout)
+        activeScans.delete(scanId)
       }
     },
   )
 
-  server.tool(
+  server.registerTool(
     'get_config',
-    'Get the current scanner configuration (model, excluded terms, LLM toggle).',
-    {},
     {
       title: 'Get Scanner Configuration',
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
+      description: 'Get the current scanner configuration (model, excluded terms, LLM toggle).',
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
     },
     async () => {
       log('info', 'get_config', 'Fetching scanner configuration')
@@ -238,15 +277,16 @@ function registerTools(availableLocales: LocaleConfig[]) {
     },
   )
 
-  server.tool(
+  server.registerTool(
     'list_models',
-    'List available Ollama models for LLM-powered example extraction.',
-    {},
     {
       title: 'List Ollama Models',
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
+      description: 'List available Ollama models for LLM-powered example extraction.',
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
     },
     async () => {
       log('info', 'list_models', 'Listing available Ollama models')
@@ -268,30 +308,79 @@ function registerTools(availableLocales: LocaleConfig[]) {
     },
   )
 
-  server.tool(
+  server.registerTool(
     'list_locales',
-    'List all available locale codes that can be scanned.',
-    {},
     {
       title: 'List Available Locales',
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
+      description: 'List all available locale codes that can be scanned.',
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
     },
     async () => {
       log('info', 'list_locales', 'Listing available locales')
-      const locales = await fetchAvailableLocales()
+      const defaults = await fetchBlockDefaults()
 
-      if (locales.length === 0) {
+      if (defaults.locales.length === 0) {
         return {
           content: [{ type: 'text' as const, text: 'No Scanner block locales configured.' }],
         }
       }
 
-      const text = locales
+      const text = defaults.locales
         .map((locale) => `- ${locale.flag} **${locale.code}** — ${locale.label}`)
         .join('\n')
       return { content: [{ type: 'text' as const, text }] }
+    },
+  )
+
+  server.registerTool(
+    'cancel_scan',
+    {
+      title: 'Cancel Scan',
+      description:
+        'Cancel an in-progress scan. If no scanId is provided, cancels all active scans.',
+      inputSchema: {
+        scanId: z
+          .string()
+          .optional()
+          .describe('The scan ID to cancel. Omit to cancel all active scans.'),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ scanId }) => {
+      if (scanId) {
+        const controller = activeScans.get(scanId)
+        if (!controller) {
+          return {
+            content: [{ type: 'text' as const, text: `No active scan found with ID: ${scanId}` }],
+          }
+        }
+        controller.abort()
+        activeScans.delete(scanId)
+        log('info', 'cancel_scan', `Cancelled scan: ${scanId}`)
+        return { content: [{ type: 'text' as const, text: `Scan ${scanId} cancelled.` }] }
+      }
+
+      const count = activeScans.size
+      if (count === 0) {
+        return { content: [{ type: 'text' as const, text: 'No active scans to cancel.' }] }
+      }
+
+      for (const [id, controller] of activeScans) {
+        controller.abort()
+        activeScans.delete(id)
+      }
+      log('info', 'cancel_scan', `Cancelled ${count} active scan(s)`)
+      return {
+        content: [{ type: 'text' as const, text: `Cancelled ${count} active scan(s).` }],
+      }
     },
   )
 }
@@ -299,8 +388,8 @@ function registerTools(availableLocales: LocaleConfig[]) {
 // ── Start ────────────────────────────────────────────────────
 
 async function main() {
-  const availableLocales = await fetchAvailableLocales()
-  registerTools(availableLocales)
+  const blockDefaults = await fetchBlockDefaults()
+  registerTools(blockDefaults)
 
   const transport = new StdioServerTransport()
   await server.connect(transport)

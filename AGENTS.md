@@ -1,4 +1,4 @@
-# i18n Content Checker v2
+# i18n Scanner v2
 
 ## Tech Stack
 

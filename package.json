@@ -7,7 +7,7 @@
   "scripts": {
     "build": "cross-env NODE_OPTIONS=--no-deprecation next build",
     "postbuild": "next-sitemap --config next-sitemap.config.cjs",
-    "db:reset": "node -e \"require('dotenv').config();const{Pool}=require('pg');const p=new Pool({connectionString:process.env.DATABASE_URL});p.query('DROP SCHEMA IF EXISTS i18n_content_checker CASCADE').then(()=>p.query('CREATE SCHEMA i18n_content_checker')).then(()=>{console.log('Schema reset OK');p.end()}).catch(e=>{console.error(e);process.exit(1)})\"",
+    "db:reset": "cross-env NODE_OPTIONS='--no-deprecation --import=tsx/esm' tsx src/scripts/db-reset.ts",
     "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
     "dev:fresh": "pnpm db:reset && pnpm dev",
     "dev:prod": "cross-env NODE_OPTIONS=--no-deprecation rm -rf .next && pnpm build && pnpm start",

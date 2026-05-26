@@ -7,9 +7,13 @@ import { ModelSelector } from '@/scanner/components/ModelSelector'
 import { ScanResults } from '@/scanner/components/ScanResults'
 import { UrlInput } from '@/scanner/components/UrlInput'
 import { fetchConfig, saveConfig } from '@/scanner/services/config-service'
-import { OllamaUnavailableError, scanLocales } from '@/scanner/services/scan-service'
+import {
+  OllamaUnavailableError,
+  ScanCancelledError,
+  scanLocales,
+} from '@/scanner/services/scan-service'
 import type { LocaleScanResult, ScannerConfigProps } from '@/scanner/types'
-import { AlertCircle, Info, Search } from 'lucide-react'
+import { AlertCircle, Info, Search, StopCircle } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 function useDebouncedSave(value: unknown, key: string, delayMs = 500): void {
@@ -46,6 +50,7 @@ export function ScannerPage({ config }: ScannerPageProps) {
   const [error, setError] = useState<string | null>(null)
   const [configLoaded, setConfigLoaded] = useState(false)
   const [ollamaToast, setOllamaToast] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     fetchConfig()
@@ -82,27 +87,38 @@ export function ScannerPage({ config }: ScannerPageProps) {
     setScanning(true)
     setResults([])
 
+    const controller = new AbortController()
+    abortRef.current = controller
+
     try {
       await scanLocales(
         { urls, locales: selectedLocales, excludedTerms, model: selectedModel, useLLM },
         (result) => setResults((prev) => [...prev, result]),
+        controller.signal,
       )
     } catch (err) {
       if (err instanceof OllamaUnavailableError) {
         setOllamaToast(true)
         setTimeout(() => setOllamaToast(false), 8000)
+      } else if (err instanceof ScanCancelledError || controller.signal.aborted) {
+        // Scan was cancelled by user — keep partial results, no error
       } else {
         setError(err instanceof Error ? err.message : 'Scan failed')
       }
     } finally {
+      abortRef.current = null
       setScanning(false)
     }
   }, [urls, selectedLocales, excludedTerms, selectedModel, useLLM])
 
+  const handleCancel = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
+
   return (
     <div className="container py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">i18n Content Checker</h1>
+        <h1 className="text-3xl font-bold">i18n Scanner</h1>
         <p className="mt-1 text-muted-foreground">
           Scan localized pages for untranslated English content
         </p>
@@ -129,6 +145,12 @@ export function ScannerPage({ config }: ScannerPageProps) {
             <Search className="mr-2 h-4 w-4" />
             {scanning ? 'Scanning...' : 'Scan pages'}
           </Button>
+          {scanning && (
+            <Button onClick={handleCancel} variant="destructive" size="lg" className="h-[44px]">
+              <StopCircle className="mr-2 h-4 w-4" />
+              Stop
+            </Button>
+          )}
         </div>
 
         {/* Locale selector */}

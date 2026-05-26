@@ -1,31 +1,50 @@
-version: '3'
-
 services:
-  payload:
-    image: node:18-alpine
+  deps:
+    build:
+      context: .
+      target: deps
+    image: i18n-checker-deps
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - '3000:3000'
-    volumes:
-      - .:/home/node/app
-      - node_modules:/home/node/app/node_modules
-    working_dir: /home/node/app/
-    command: sh -c "yarn install && yarn dev"
+    env_file: .env
     depends_on:
-      - mongo
-    env_file:
-      - .env
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://payload:payload@db:5432/i18n_checker
+      - PAYLOAD_SECRET=${PAYLOAD_SECRET:-change-me-in-production}
+      - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-http://localhost:3000}
 
-  mongo:
-    image: mongo:latest
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: payload
+      POSTGRES_PASSWORD: payload
+      POSTGRES_DB: i18n_checker
     ports:
-      - '27017:27017'
-    command:
-      - --storageEngine=wiredTiger
+      - '5432:5432'
     volumes:
-      - data:/data/db
-    logging:
-      driver: none
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U payload -d i18n_checker']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama_data:/root/.ollama
+    profiles:
+      - llm
 
 volumes:
-  data:
-  node_modules:
+  pgdata:
+  ollama_data:

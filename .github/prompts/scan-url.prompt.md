@@ -1,7 +1,7 @@
 ---
-description: 'i18n: Scan a URL for untranslated content using the i18n Content Checker MCP server. Returns a report per locale.'
+description: 'i18n: Scan a URL for untranslated content using the i18n Scanner MCP server. Returns a report per locale.'
 argument-hint: 'URL to scan, e.g. https://www.example.com/pricing'
-tools: ['i18n-content-checker/*']
+tools: ['i18n-scanner/*']
 ---
 
 Scan the provided URL for untranslated (English) content.

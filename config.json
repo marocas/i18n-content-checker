@@ -8,7 +8,12 @@
     "API",
     "SaaS",
     "AI",
-    "Cloud"
+    "Cloud",
+    "Talkdesk",
+    "Talkdesk Copilot",
+    "Support",
+    "Service Desk",
+    "Customer Experience"
   ],
   "useLLM": false
 }

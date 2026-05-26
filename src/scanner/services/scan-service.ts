@@ -7,14 +7,23 @@ export class OllamaUnavailableError extends Error {
   }
 }
 
+export class ScanCancelledError extends Error {
+  constructor() {
+    super('Scan cancelled')
+    this.name = 'ScanCancelledError'
+  }
+}
+
 export async function scanLocales(
   request: ScanRequest,
   onResult: (result: LocaleScanResult) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const response = await fetch('/api/scanner/scan', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
+    signal,
   })
 
   if (!response.ok) {

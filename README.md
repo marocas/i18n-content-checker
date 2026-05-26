@@ -1,4 +1,4 @@
-# i18n Content Checker
+# i18n Scanner
 
 A Next.js 16 + Payload CMS v3 web application that scans localized web pages for untranslated English content. Enter a URL, select target locales, and the tool will detect English text that may have been left untranslated.
 

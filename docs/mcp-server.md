@@ -1,4 +1,4 @@
-# MCP Server — i18n Content Checker
+# MCP Server — i18n Scanner
 
 ## Overview
 
@@ -40,7 +40,7 @@ The server is pre-configured in `.vscode/mcp.json`. To activate:
 
 1. Start the app: `pnpm dev`
 2. Open Command Palette → **MCP: List Servers**
-3. `i18n-content-checker` should appear — start it
+3. `i18n-scanner` should appear — start it
 4. Use tools in Copilot Chat via `@` mention
 
 ### 2. Manual

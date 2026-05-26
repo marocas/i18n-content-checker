@@ -1,6 +1,6 @@
 {
   "servers": {
-    "i18n-content-checker": {
+    "i18n-scanner": {
       "type": "stdio",
       "command": "pnpm",
       "args": ["mcp"],
