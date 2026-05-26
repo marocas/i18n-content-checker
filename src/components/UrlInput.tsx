@@ -54,9 +54,9 @@ export default function UrlInput({ value, onChange, disabled }: UrlInputProps) {
             if (rejected) setInputValue(rejected);
           }
         }}
-        renderTags={(tagValue, getTagProps) =>
-          tagValue.map((option, index) => {
-            const { key, ...rest } = getTagProps({ index });
+        renderValue={(values, getItemProps) =>
+          values.map((option: string, index: number) => {
+            const { key, ...rest } = getItemProps({ index });
             return <Chip key={key} label={option} size="small" {...rest} />;
           })
         }
