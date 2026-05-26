@@ -157,18 +157,41 @@ export async function detectEnglishWithLLM(
   const heuristic: HeuristicResult = detectLanguageHeuristic(text);
 
   // Filter excluded terms from displayed englishWords (case-insensitive)
-  // but keep detection untouched so no sentences slip through
-  const excludedLower = new Set(excludedTerms.map((t) => t.toLowerCase()));
+  const singleWordExcluded = new Set<string>();
+  const multiWordExcluded: string[][] = [];
+  for (const term of excludedTerms) {
+    const words = term.toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length === 1) singleWordExcluded.add(words[0]);
+    else if (words.length > 1) multiWordExcluded.push(words);
+  }
 
   function filterExcluded(examples: FlaggedSentence[]): FlaggedSentence[] {
     return examples
-      .map((s) => ({
-        text: s.text,
-        englishWords: s.englishWords.filter(
-          (w) => !excludedLower.has(w.toLowerCase()),
-        ),
-      }))
+      .map((s) => {
+        const wordsLower = new Set(s.englishWords.map((w) => w.toLowerCase()));
+        const multiMatched = new Set<string>();
+        for (const termWords of multiWordExcluded) {
+          if (termWords.every((tw) => wordsLower.has(tw))) {
+            for (const tw of termWords) multiMatched.add(tw);
+          }
+        }
+        return {
+          text: s.text,
+          englishWords: s.englishWords.filter(
+            (w) =>
+              !singleWordExcluded.has(w.toLowerCase()) &&
+              !multiMatched.has(w.toLowerCase()),
+          ),
+        };
+      })
       .filter((s) => s.englishWords.length > 0);
+  }
+
+  function recalculatePercent(filteredExamples: FlaggedSentence[]): number {
+    if (heuristic.totalSentences === 0) return 0;
+    return Math.round(
+      (filteredExamples.length / heuristic.totalSentences) * 100,
+    );
   }
 
   // All heuristic-flagged sentences
@@ -181,9 +204,10 @@ export async function detectEnglishWithLLM(
     if (heuristic.untranslatedPercent === 0) {
       return { untranslatedPercent: 0, examples: [] };
     }
+    const filtered = filterExcluded(heuristicExamples);
     return {
-      untranslatedPercent: heuristic.untranslatedPercent,
-      examples: filterExcluded(heuristicExamples),
+      untranslatedPercent: recalculatePercent(filtered),
+      examples: filtered,
     };
   }
 
@@ -210,11 +234,10 @@ export async function detectEnglishWithLLM(
 
     const filteredMerged = filterExcluded(merged);
 
-    // If the LLM found English the heuristic missed, ensure we report > 0%
     const untranslatedPercent =
-      heuristic.untranslatedPercent > 0 || filteredMerged.length === 0
-        ? heuristic.untranslatedPercent
-        : 1; // floor at 1% so LLM findings surface
+      filteredMerged.length > 0
+        ? Math.max(recalculatePercent(filteredMerged), 1)
+        : 0;
 
     return {
       untranslatedPercent,
@@ -226,9 +249,10 @@ export async function detectEnglishWithLLM(
       throw err;
     }
     // Other LLM failures — still return heuristic results
+    const filtered = filterExcluded(heuristicExamples);
     return {
-      untranslatedPercent: heuristic.untranslatedPercent,
-      examples: filterExcluded(heuristicExamples),
+      untranslatedPercent: recalculatePercent(filtered),
+      examples: filtered,
     };
   }
 }

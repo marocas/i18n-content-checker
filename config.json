@@ -10,8 +10,10 @@
     "AI",
     "Cloud",
     "Talkdesk",
-    "Customer Experience",
-    "Talkdesk Copilot"
+    "Talkdesk Copilot",
+    "Support",
+    "Service Desk",
+    "Customer Experience"
   ],
-  "useLLM": true
+  "useLLM": false
 }
