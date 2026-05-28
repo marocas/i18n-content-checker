@@ -1,5 +1,5 @@
 {
-  "model": "gemma4:e2b",
+  "model": "nomic-embed-text:latest",
   "excludedTerms": [
     "JavaScript",
     "CSS",

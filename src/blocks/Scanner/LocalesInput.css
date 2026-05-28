@@ -1,0 +1,117 @@
+.locales-input-field {
+  border: 1px solid var(--theme-elevation-150, #333);
+  border-radius: 4px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.locales-input-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--theme-text, #fff);
+}
+
+.locales-input-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.locales-input-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  cursor: grab;
+  transition:
+    opacity 0.15s,
+    border-color 0.15s;
+}
+
+.locales-input-row--dragging {
+  opacity: 0.4;
+}
+
+.locales-input-row--drag-over {
+  border-top: 2px solid var(--theme-success-500, #48bb78);
+}
+
+.locales-input-drag-handle {
+  cursor: grab;
+  color: var(--theme-elevation-400, #666);
+  font-size: 1.1rem;
+  user-select: none;
+  flex-shrink: 0;
+  width: 1.25rem;
+  text-align: center;
+}
+
+.locales-input-drag-handle:active {
+  cursor: grabbing;
+}
+
+.locales-input-text {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--theme-elevation-150, #333);
+  border-radius: 4px;
+  background: var(--theme-input-bg, transparent);
+  color: var(--theme-text, #fff);
+  font-size: 0.875rem;
+}
+
+.locales-input-text:focus {
+  border-color: var(--theme-elevation-400, #666);
+  outline: none;
+}
+
+.locales-input-code {
+  width: 80px;
+}
+
+.locales-input-flag {
+  width: 60px;
+  text-align: center;
+}
+
+.locales-input-label-field {
+  flex: 1;
+}
+
+.locales-input-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--theme-elevation-150, #333);
+  border-radius: 4px;
+  background: none;
+  color: var(--theme-elevation-500, #999);
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.locales-input-remove:hover {
+  color: var(--theme-error-500, #e53e3e);
+  border-color: var(--theme-error-500, #e53e3e);
+}
+
+.locales-input-add {
+  padding: 0.5rem 1rem;
+  border: 1px dashed var(--theme-elevation-200, #444);
+  border-radius: 4px;
+  background: none;
+  color: var(--theme-text, #fff);
+  cursor: pointer;
+  font-size: 0.875rem;
+  width: 100%;
+}
+
+.locales-input-add:hover {
+  border-color: var(--theme-elevation-400, #666);
+  background: var(--theme-elevation-50, #111);
+}

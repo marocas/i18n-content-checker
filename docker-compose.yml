@@ -1,42 +1,50 @@
-# Unified composition: single dependency install reused across all services.
-# Workflow:
-#   1. docker compose build deps   (runs pnpm install once via Dockerfile deps stage)
-#   2. docker compose build app    (builds Next.js using cached deps layer)
-#   3. docker compose up app       (run services)
-# Notes:
-# - BuildKit layer cache handles reuse; services reference the same Dockerfile.
-# - Source mounted for rapid iteration; remove volume mounts to create immutable images.
-
 services:
   deps:
     build:
       context: .
-      dockerfile: Dockerfile
       target: deps
-    image: i18n/deps:local
-    command: ["sh", "-c", "tail -f /dev/null"]
-    volumes:
-      - ./:/app
-    working_dir: /app
+    image: i18n-checker-deps
 
   app:
-    depends_on:
-      - deps
-      - ollama
     build:
       context: .
       dockerfile: Dockerfile
-      target: runtime-app
-    image: i18n/app:local
     ports:
-      - "3000:3000"
+      - '3000:3000'
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
-      - OLLAMA_HOST=http://ollama:11434
+      - DATABASE_URL=postgresql://payload:payload@db:5432/i18n_checker
+      - PAYLOAD_SECRET=${PAYLOAD_SECRET:-change-me-in-production}
+      - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL:-http://localhost:3000}
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: payload
+      POSTGRES_PASSWORD: payload
+      POSTGRES_DB: i18n_checker
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U payload -d i18n_checker']
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   ollama:
-    image: ollama/ollama
+    image: ollama/ollama:latest
+    ports:
+      - '11434:11434'
     volumes:
-      - ollama-data:/root/.ollama
+      - ollama_data:/root/.ollama
+    profiles:
+      - llm
 
 volumes:
-  ollama-data:
+  pgdata:
+  ollama_data:

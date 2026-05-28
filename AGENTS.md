@@ -1,83 +1,92 @@
-<!-- BEGIN:nextjs-agent-rules -->
-
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-
-<!-- END:nextjs-agent-rules -->
-
-# Project Architecture
+# i18n Scanner v2
 
 ## Tech Stack
 
-- **Next.js 16** (App Router, Turbopack) + **React 19** + **TypeScript**
-- **MUI 9** (Material UI) — uses slot-based API (`params.slotProps.input`, not `params.InputProps`)
-- **Ollama** — local LLM for example extraction
-- **cheerio** — server-side HTML parsing
-- **pnpm** — package manager (do NOT use npm or yarn)
+- **Framework**: Next.js 16 (App Router, Turbopack) + React 19 + TypeScript (strict)
+- **CMS / Backend**: Payload CMS v3 (`@payloadcms/next`) + PostgreSQL
+- **UI**: Tailwind CSS 4 + shadcn/ui + Radix primitives
+- **Scanner**: cheerio (HTML parsing) + Ollama (local LLM for example extraction)
+- **Testing**: Vitest (integration) + Playwright (e2e)
+- **Package manager**: pnpm (do NOT use npm or yarn)
 
-## Folder Structure
+## Project Structure
 
 ```
 src/
-├── app/              # Next.js App Router — pages and API routes only
-│   ├── page.tsx      # Main page (client component, orchestrates state)
-│   ├── layout.tsx    # Root layout
-│   └── api/          # Server-side API routes (Next.js Route Handlers)
-│       ├── config/   # GET/PUT config.json persistence
-│       ├── models/   # GET available Ollama models
-│       └── scan/     # POST scan locales (NDJSON streaming response)
-├── components/       # React UI components ("use client")
-├── services/         # Client-side fetch wrappers for API routes
-├── lib/              # Server-side utilities and core logic
-│   ├── types.ts      # Shared TypeScript interfaces
-│   ├── ollama-detector.ts   # LLM integration (example extraction)
-│   ├── language-heuristic.ts # Fast English detection heuristic
-│   └── url-utils.ts  # URL manipulation helpers
-└── theme.ts          # MUI theme configuration
+├── app/
+│   ├── (frontend)/[locale]/   # Public website (i18n routes)
+│   │   ├── [...slug]/         # CMS-managed pages (Payload layout builder)
+│   │   └── posts/             # Blog posts
+│   ├── (payload)/             # Payload CMS admin panel
+│   └── api/scanner/           # Scanner API routes (scan, config, models)
+├── scanner/                   # Scanner feature (self-contained)
+│   ├── components/            # Scanner UI components (client-side)
+│   ├── lib/                   # Server-side logic (heuristic, LLM, URL utils)
+│   ├── services/              # Client-side fetch wrappers for scanner API
+│   └── types.ts               # Scanner-specific types
+├── mcp/                       # MCP server (see docs/mcp-server.md)
+├── collections/               # Payload collection definitions
+├── globals/                   # Payload globals (Header, Footer, AiTranslation)
+├── i18n/config.ts             # Locale configuration (en, pt, es, fr)
+├── proxy.ts                   # Middleware for locale routing
+└── payload.config.ts          # Payload CMS configuration
+```
+
+## Commands
+
+```bash
+pnpm dev           # Start dev server (Turbopack)
+pnpm build         # Production build
+pnpm lint          # ESLint
+pnpm test          # Run all tests (integration + e2e)
+pnpm test:int      # Vitest integration tests only
+pnpm test:e2e      # Playwright e2e tests only
+pnpm mcp           # Start MCP server (requires app running)
+pnpm seed          # Seed the database
+pnpm dev:fresh     # Reset DB schema + start dev
 ```
 
 ## Conventions
 
-### Where to put new code
+### Code Style
 
-| What you're adding        | Where it goes                    |
-| ------------------------- | -------------------------------- |
-| New page                  | `src/app/<route>/page.tsx`       |
-| New API endpoint          | `src/app/api/<name>/route.ts`    |
-| React component           | `src/components/<Name>.tsx`      |
-| Client-side API call      | `src/services/<name>-service.ts` |
-| Server-side utility/logic | `src/lib/<name>.ts`              |
-| Shared types/interfaces   | `src/lib/types.ts`               |
+- **No semicolons**, single quotes, trailing commas, 100 char width, 2-space indent (see `.prettierrc.json`)
+- Path alias: `@/*` → `src/*`
+- Files: `kebab-case.ts` / `PascalCase.tsx` for components
+- TypeScript strict mode — avoid `any`
 
-### Rules
+### Architecture Boundaries
 
-- **API routes** (`src/app/api/`) run server-side only. Never import from `services/` in API routes.
-- **Services** (`src/services/`) are client-side fetch wrappers. They call API routes and return typed data. Never put business logic here.
-- **Lib** (`src/lib/`) is for server-side logic. Never use `fetch()` to call our own API routes from lib — that's what services are for on the client.
-- **Components** are `"use client"` React components. They receive data via props or call services directly. Keep them focused on presentation.
-- **Types** shared between client and server live in `src/lib/types.ts`.
-- Use **NDJSON streaming** for long-running API responses (see `scan/route.ts`).
-- Config is persisted to `config.json` at project root via the config API route.
+| What you're adding     | Where it goes                                  |
+| ---------------------- | ---------------------------------------------- |
+| Payload collection     | `src/collections/<Name>.ts`                    |
+| Payload global         | `src/globals/<Name>/config.ts`                 |
+| Scanner UI component   | `src/scanner/components/`                      |
+| Scanner server logic   | `src/scanner/lib/`                             |
+| Scanner API endpoint   | `src/app/api/scanner/<name>/route.ts`          |
+| Scanner client service | `src/scanner/services/`                        |
+| CMS page/frontend      | `src/app/(frontend)/[locale]/`                 |
+| Shared types           | `src/scanner/types.ts` (scanner) or co-located |
+| MCP server             | `src/mcp/`                                     |
 
-### MUI 9 Gotchas
+### Scanner Detection (Hybrid)
 
-- Autocomplete: use `params.slotProps.input` (NOT `params.InputProps`)
-- Typography: put `fontWeight` in `sx` prop, not as a direct prop
-- Always check MUI 9 migration notes before using MUI components
+1. **Heuristic** (`language-heuristic.ts`) — instant, deterministic English word-frequency analysis
+2. **LLM** (`ollama-detector.ts`) — samples chunks via Ollama for illustrative examples
+3. If heuristic returns 0% untranslated, LLM is skipped
 
-### Detection Architecture
+### API Routes
 
-The scanner uses a **hybrid approach**:
+- Scanner API uses **NDJSON streaming** for long-running scan responses
+- API routes are server-side only — never import from `services/` in API routes
+- Services (`scanner/services/`) are client-side fetch wrappers — no business logic
 
-1. **Heuristic** (`language-heuristic.ts`) — instant, deterministic English word-frequency analysis for the untranslated percentage
-2. **LLM** (`ollama-detector.ts`) — samples 1–2 text chunks via Ollama for illustrative example sentences
-3. If heuristic returns 0% untranslated, the LLM is skipped entirely
+### i18n
 
-### Naming
+- Locales: `en` (default), `pt`, `es`, `fr` — defined in `src/i18n/config.ts`
+- Frontend routes: `(frontend)/[locale]/`
+- Payload fields use `localized: true` for translatable content
 
-- Files: `kebab-case.ts` / `kebab-case.tsx`
-- Components: `PascalCase.tsx`
-- Services: `<name>-service.ts`
-- Interfaces/types: `PascalCase`
-- Constants: `UPPER_SNAKE_CASE`
+## Key Documentation
+
+- [MCP Server](docs/mcp-server.md) — Architecture, tools, compliance checklist

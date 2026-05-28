@@ -1,0 +1,82 @@
+.tags-input-field {
+  margin-bottom: 1rem;
+}
+
+.tags-input-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.375rem;
+  color: var(--theme-text, #fff);
+}
+
+.tags-input-description {
+  font-size: 0.75rem;
+  color: var(--theme-elevation-500, #9ca3af);
+  margin: 0 0 0.5rem;
+}
+
+.tags-input-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--theme-elevation-150, #333);
+  border-radius: 4px;
+  background: var(--theme-input-bg, transparent);
+  min-height: 2.5rem;
+  cursor: text;
+}
+
+.tags-input-container:focus-within {
+  border-color: var(--theme-elevation-400, #666);
+}
+
+.tags-input-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  background: var(--theme-elevation-100, #222);
+  border: 1px solid var(--theme-elevation-200, #444);
+  border-radius: 1rem;
+  font-size: 0.8125rem;
+  color: var(--theme-text, #fff);
+}
+
+.tags-input-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border: none;
+  background: none;
+  color: var(--theme-elevation-500, #999);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.tags-input-chip-remove:hover {
+  color: var(--theme-error-500, #e53e3e);
+  background: var(--theme-elevation-200, #333);
+}
+
+.tags-input-input {
+  flex: 1;
+  min-width: 120px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--theme-text, #fff);
+  font-size: 0.875rem;
+  padding: 0.125rem 0;
+}
+
+.tags-input-input::placeholder {
+  color: var(--theme-elevation-400, #666);
+}
